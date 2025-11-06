@@ -10,12 +10,13 @@ public class RateLimitSampleController {
     @RateLimit(limit = 5, duration = 1) // 5 requests per minute
     @GetMapping("/hello")
     public String hello() {
-        return "Hello from annotated rate limit!";
+        return "Hello from Redis-backed rate limit!";
     }
 
     @RateLimit(limit = 3, duration = 30, unit = java.util.concurrent.TimeUnit.SECONDS)
     @GetMapping("/fast")
     public String fast() {
-        return "This endpoint allows only 3 requests every 30 seconds!";
+        return "3 requests every 30 seconds (shared across instances)";
     }
 }
+

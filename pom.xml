@@ -36,12 +36,6 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
-			<exclusions>
-				<exclusion>
-					<artifactId>spring-boot-starter-logging</artifactId>
-					<groupId>org.springframework.boot</groupId>
-				</exclusion>
-			</exclusions>
 		</dependency>
 
 		<!--RATE-LIMIT-->
@@ -67,6 +61,11 @@
 			<groupId>com.bucket4j</groupId>
 			<artifactId>bucket4j_jdk17-lettuce</artifactId>
 			<version>8.15.0</version>
+		</dependency>
+		<dependency>
+			<groupId>io.lettuce</groupId>
+			<artifactId>lettuce-core</artifactId>
+			<version>6.3.2.RELEASE</version>
 		</dependency>
 
 		<!--TESTS-->
