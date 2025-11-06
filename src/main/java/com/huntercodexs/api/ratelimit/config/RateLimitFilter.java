@@ -36,7 +36,7 @@ public class RateLimitFilter implements Filter {
     }
 
     private Bucket newBucket(String key) {
-        Refill refill = Refill.greedy(10, Duration.ofMinutes(1)); //10 tokens per minute
+        Refill refill = Refill.greedy(5, Duration.ofSeconds(30)); // 5 req a cada 30s
         Bandwidth limit = Bandwidth.classic(10, refill);
         return Bucket.builder().addLimit(limit).build();
     }
