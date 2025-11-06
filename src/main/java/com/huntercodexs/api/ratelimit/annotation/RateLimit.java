@@ -5,9 +5,14 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+import java.lang.annotation.*;
+import java.util.concurrent.TimeUnit;
+
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
+@Documented
 public @interface RateLimit {
-    int limit() default 5;
-    long timeWindowSeconds() default 60;
+    int limit();
+    int duration();
+    TimeUnit unit() default TimeUnit.MINUTES;
 }

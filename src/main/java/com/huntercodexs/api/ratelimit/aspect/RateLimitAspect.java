@@ -2,46 +2,67 @@ package com.huntercodexs.api.ratelimit.aspect;
 
 import com.huntercodexs.api.ratelimit.annotation.RateLimit;
 import com.huntercodexs.api.ratelimit.handler.exception.RateLimitExceededException;
-import com.huntercodexs.api.ratelimit.service.RedisRateLimiterService;
+import com.huntercodexs.api.ratelimit.service.RateLimitService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
 
 import java.lang.reflect.Method;
+import java.util.concurrent.TimeUnit;
 
 @Aspect
 @Component
 public class RateLimitAspect {
 
-    @Autowired
-    private RedisRateLimiterService rateLimiterService;
+    private final RateLimitService rateLimitService;
 
-    @Autowired
-    private HttpServletRequest request;
+    public RateLimitAspect(RateLimitService rateLimitService) {
+        this.rateLimitService = rateLimitService;
+    }
 
-    @Around("@annotation(rateLimit)")
-    public Object rateLimit(ProceedingJoinPoint joinPoint, RateLimit rateLimit) throws Throwable {
+    @Around("@annotation(com.huntercodexs.api.ratelimit.annotation.RateLimit)")
+    public Object around(ProceedingJoinPoint pjp) throws Throwable {
+        MethodSignature sig = (MethodSignature) pjp.getSignature();
+        Method method = sig.getMethod();
+        RateLimit annotation = method.getAnnotation(RateLimit.class);
 
-        MethodSignature signature = (MethodSignature) joinPoint.getSignature();
-        Method method = signature.getMethod();
+        int limit = annotation.limit();
+        int duration = annotation.duration();
+        TimeUnit unit = annotation.unit();
 
-        String clientIdentifier = request.getRemoteAddr();
-        String redisKey = "ratelimit:" + clientIdentifier + ":" + method.getName();
-
-        boolean allowed = rateLimiterService.isAllowed(
-                redisKey,
-                rateLimit.limit(),
-                rateLimit.timeWindowSeconds()
-        );
-
-        if (!allowed) {
-            throw new RateLimitExceededException("Too Many Requests");
+        // Tentativa de identificar quem está chamando:
+        String identifier = getIdentifier();
+        if (identifier == null) {
+            // fallback para método
+            identifier = method.getDeclaringClass().getSimpleName() + "." + method.getName();
         }
 
-        return joinPoint.proceed();
+        String key = rateLimitService.buildKey("method", identifier, duration, unit);
+
+        boolean allowed = rateLimitService.isAllowed(key, limit, duration, unit);
+        if (!allowed) {
+            throw new RateLimitExceededException("Rate limit exceeded for " + identifier);
+        }
+
+        return pjp.proceed();
+    }
+
+    private String getIdentifier() {
+        RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
+        if (attrs == null) return null;
+        Object req = attrs.resolveReference(RequestAttributes.REFERENCE_REQUEST);
+        if (req instanceof HttpServletRequest request) {
+            // exemplo: usa header X-Client-Id se disponível, senão IP remoto.
+            String client = request.getHeader("X-Client-Id");
+            if (client != null && !client.isBlank()) return client;
+            String ip = request.getRemoteAddr();
+            if (ip != null) return ip;
+        }
+        return null;
     }
 }
