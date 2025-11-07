@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit;
 public class RateLimitSampleController {
 
     @GetMapping("/test")
-    @RateLimit(limit = 5, duration = 1, unit = TimeUnit.MINUTES) // exemplo: 5 requisições por 1 minuto por cliente
+    @RateLimit(limit = 5, duration = 1, unit = TimeUnit.MINUTES)
     public String test() {
         return "Dados liberados com sucesso!";
     }

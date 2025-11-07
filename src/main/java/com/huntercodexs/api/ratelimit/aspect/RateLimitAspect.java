@@ -27,6 +27,7 @@ public class RateLimitAspect {
 
     @Around("@annotation(com.huntercodexs.api.ratelimit.annotation.RateLimit)")
     public Object around(ProceedingJoinPoint pjp) throws Throwable {
+
         MethodSignature sig = (MethodSignature) pjp.getSignature();
         Method method = sig.getMethod();
         RateLimit annotation = method.getAnnotation(RateLimit.class);
@@ -35,14 +36,13 @@ public class RateLimitAspect {
         int duration = annotation.duration();
         TimeUnit unit = annotation.unit();
 
-        // Tentativa de identificar quem está chamando:
+        // Try to get identifier from request (e.g., client ID or IP)
         String identifier = getIdentifier();
         if (identifier == null) {
-            // fallback para método
             identifier = method.getDeclaringClass().getSimpleName() + "." + method.getName();
         }
 
-        String key = rateLimitService.buildKey("method", identifier, duration, unit);
+        String key = rateLimitService.buildKey(method.getName(), identifier, duration, unit);
 
         boolean allowed = rateLimitService.isAllowed(key, limit, duration, unit);
         if (!allowed) {
@@ -54,15 +54,24 @@ public class RateLimitAspect {
 
     private String getIdentifier() {
         RequestAttributes attrs = RequestContextHolder.getRequestAttributes();
+
         if (attrs == null) return null;
+
         Object req = attrs.resolveReference(RequestAttributes.REFERENCE_REQUEST);
+
         if (req instanceof HttpServletRequest request) {
-            // exemplo: usa header X-Client-Id se disponível, senão IP remoto.
+
             String client = request.getHeader("X-Client-Id");
-            if (client != null && !client.isBlank()) return client;
+            if (client != null && !client.isBlank()) {
+                return client;
+            }
+
             String ip = request.getRemoteAddr();
-            if (ip != null) return ip;
+            if (ip != null) {
+                return ip;
+            }
         }
+
         return null;
     }
 }
