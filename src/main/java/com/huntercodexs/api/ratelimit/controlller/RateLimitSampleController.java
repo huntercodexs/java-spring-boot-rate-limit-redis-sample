@@ -9,16 +9,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class RateLimitSampleController {
 
-    // Limite de 3 requisições a cada 10 segundos
-    @GetMapping("/api/limitado")
+    @GetMapping("/api/limited")
     @RateLimit(limit = 3, duration = 10, unit = TimeUnit.SECONDS)
     public String limitedEndpoint() {
-        return "Requisição permitida. Limite: 3/10s.";
+        return "Request Allowed. Limit: 3/10s.";
     }
 
-    // Endpoint sem Rate Limit para comparação
-    @GetMapping("/api/publico")
+    @GetMapping("/api/public")
     public String publicEndpoint() {
-        return "Requisição permitida. Este endpoint não tem Rate Limit.";
+        return "Request Allowed. This is a free endpoint.";
     }
 }

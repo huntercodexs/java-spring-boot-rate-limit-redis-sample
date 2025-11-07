@@ -4,7 +4,7 @@ Sample application to demonstration rate limit + redis management
 ### How to test
 
 ```shell
-for i in {1..10}; do sleep 1; curl -i -H "X-Client-Id: client-1" http://localhost:8080/api/limitado; echo; done
+for i in {1..10}; do sleep 1; curl -i -H "X-Client-Id: client-1" http://localhost:8080/api/limited; echo; done
 ```
 
 Result
@@ -12,62 +12,63 @@ Result
 ```text
 HTTP/1.1 200 
 Content-Type: text/plain;charset=UTF-8
-Content-Length: 38
-Date: Fri, 07 Nov 2025 10:30:28 GMT
+Content-Length: 30
+Date: Fri, 07 Nov 2025 22:26:53 GMT
 
-Requisição permitida. Limite: 3/10s.
+Request Allowed. Limit: 3/10s.
 HTTP/1.1 200 
 Content-Type: text/plain;charset=UTF-8
-Content-Length: 38
-Date: Fri, 07 Nov 2025 10:30:29 GMT
+Content-Length: 30
+Date: Fri, 07 Nov 2025 22:26:54 GMT
 
-Requisição permitida. Limite: 3/10s.
+Request Allowed. Limit: 3/10s.
 HTTP/1.1 200 
 Content-Type: text/plain;charset=UTF-8
-Content-Length: 38
-Date: Fri, 07 Nov 2025 10:30:30 GMT
+Content-Length: 30
+Date: Fri, 07 Nov 2025 22:26:55 GMT
 
-Requisição permitida. Limite: 3/10s.
+Request Allowed. Limit: 3/10s.
 HTTP/1.1 429 
 Content-Type: text/plain;charset=UTF-8
 Content-Length: 61
-Date: Fri, 07 Nov 2025 10:30:31 GMT
+Date: Fri, 07 Nov 2025 22:26:56 GMT
 
 Limite de requisições excedido. Tente novamente mais tarde.
 HTTP/1.1 429 
 Content-Type: text/plain;charset=UTF-8
 Content-Length: 61
-Date: Fri, 07 Nov 2025 10:30:32 GMT
+Date: Fri, 07 Nov 2025 22:26:57 GMT
 
 Limite de requisições excedido. Tente novamente mais tarde.
 HTTP/1.1 429 
 Content-Type: text/plain;charset=UTF-8
 Content-Length: 61
-Date: Fri, 07 Nov 2025 10:30:33 GMT
+Date: Fri, 07 Nov 2025 22:26:58 GMT
 
 Limite de requisições excedido. Tente novamente mais tarde.
 HTTP/1.1 429 
 Content-Type: text/plain;charset=UTF-8
 Content-Length: 61
-Date: Fri, 07 Nov 2025 10:30:34 GMT
+Date: Fri, 07 Nov 2025 22:26:59 GMT
 
 Limite de requisições excedido. Tente novamente mais tarde.
 HTTP/1.1 429 
 Content-Type: text/plain;charset=UTF-8
 Content-Length: 61
-Date: Fri, 07 Nov 2025 10:30:35 GMT
+Date: Fri, 07 Nov 2025 22:27:00 GMT
 
 Limite de requisições excedido. Tente novamente mais tarde.
 HTTP/1.1 429 
 Content-Type: text/plain;charset=UTF-8
 Content-Length: 61
-Date: Fri, 07 Nov 2025 10:30:36 GMT
+Date: Fri, 07 Nov 2025 22:27:01 GMT
 
 Limite de requisições excedido. Tente novamente mais tarde.
 HTTP/1.1 429 
 Content-Type: text/plain;charset=UTF-8
 Content-Length: 61
-Date: Fri, 07 Nov 2025 10:30:37 GMT
+Date: Fri, 07 Nov 2025 22:27:02 GMT
 
 Limite de requisições excedido. Tente novamente mais tarde.
+
 ```

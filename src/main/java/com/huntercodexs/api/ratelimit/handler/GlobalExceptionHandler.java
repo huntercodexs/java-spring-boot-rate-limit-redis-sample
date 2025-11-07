@@ -7,18 +7,12 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.WebRequest;
 
-// **Ter um tratamento de exception via algum handler**
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(RateLimitExceededException.class)
-    public ResponseEntity<Object> handleRateLimitExceededException(
-            RateLimitExceededException ex, WebRequest request) {
-
+    public ResponseEntity<Object> handleRateLimitExceededException(RateLimitExceededException ex, WebRequest request) {
         String errorMessage = "Limite de requisições excedido. Tente novamente mais tarde.";
-
         return new ResponseEntity<>(errorMessage, HttpStatus.TOO_MANY_REQUESTS);
     }
-
-    // Você pode adicionar outros Exception Handlers aqui...
 }
