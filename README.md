@@ -4,7 +4,7 @@ Sample application to demonstration rate limit + redis management
 ### How to test
 
 ```shell
-for i in {1..10}; do sleep 1; curl -i -H "X-Client-Id: client-1" http://localhost:8080/test; echo; done
+for i in {1..10}; do sleep 1; curl -i -H "X-Client-Id: client-1" http://localhost:8080/api/limitado; echo; done
 ```
 
 Result
@@ -12,62 +12,62 @@ Result
 ```text
 HTTP/1.1 200 
 Content-Type: text/plain;charset=UTF-8
-Content-Length: 28
-Date: Thu, 06 Nov 2025 16:59:35 GMT
+Content-Length: 38
+Date: Fri, 07 Nov 2025 10:30:28 GMT
 
-Dados liberados com sucesso!
+Requisição permitida. Limite: 3/10s.
 HTTP/1.1 200 
 Content-Type: text/plain;charset=UTF-8
-Content-Length: 28
-Date: Thu, 06 Nov 2025 16:59:36 GMT
+Content-Length: 38
+Date: Fri, 07 Nov 2025 10:30:29 GMT
 
-Dados liberados com sucesso!
+Requisição permitida. Limite: 3/10s.
 HTTP/1.1 200 
 Content-Type: text/plain;charset=UTF-8
-Content-Length: 28
-Date: Thu, 06 Nov 2025 16:59:37 GMT
+Content-Length: 38
+Date: Fri, 07 Nov 2025 10:30:30 GMT
 
-Dados liberados com sucesso!
-HTTP/1.1 200 
+Requisição permitida. Limite: 3/10s.
+HTTP/1.1 429 
 Content-Type: text/plain;charset=UTF-8
-Content-Length: 28
-Date: Thu, 06 Nov 2025 16:59:38 GMT
+Content-Length: 61
+Date: Fri, 07 Nov 2025 10:30:31 GMT
 
-Dados liberados com sucesso!
-HTTP/1.1 200 
+Limite de requisições excedido. Tente novamente mais tarde.
+HTTP/1.1 429 
 Content-Type: text/plain;charset=UTF-8
-Content-Length: 28'
-Date: Thu, 06 Nov 2025 16:59:39 GMT
+Content-Length: 61
+Date: Fri, 07 Nov 2025 10:30:32 GMT
 
-Dados liberados com sucesso!
+Limite de requisições excedido. Tente novamente mais tarde.
 HTTP/1.1 429 
-Content-Type: application/json
-Transfer-Encoding: chunked
-Date: Thu, 06 Nov 2025 16:59:40 GMT
+Content-Type: text/plain;charset=UTF-8
+Content-Length: 61
+Date: Fri, 07 Nov 2025 10:30:33 GMT
 
-{"error":"Too Many Requests","message":"Rate limit exceeded for client-1","timestamp":"2025-11-06T16:59:40.125740116Z","status":429}
+Limite de requisições excedido. Tente novamente mais tarde.
 HTTP/1.1 429 
-Content-Type: application/json
-Transfer-Encoding: chunked
-Date: Thu, 06 Nov 2025 16:59:41 GMT
+Content-Type: text/plain;charset=UTF-8
+Content-Length: 61
+Date: Fri, 07 Nov 2025 10:30:34 GMT
 
-{"error":"Too Many Requests","message":"Rate limit exceeded for client-1","timestamp":"2025-11-06T16:59:41.150841518Z","status":429}
+Limite de requisições excedido. Tente novamente mais tarde.
 HTTP/1.1 429 
-Content-Type: application/json
-Transfer-Encoding: chunked
-Date: Thu, 06 Nov 2025 16:59:42 GMT
+Content-Type: text/plain;charset=UTF-8
+Content-Length: 61
+Date: Fri, 07 Nov 2025 10:30:35 GMT
 
-{"error":"Too Many Requests","message":"Rate limit exceeded for client-1","timestamp":"2025-11-06T16:59:42.164288683Z","status":429}
+Limite de requisições excedido. Tente novamente mais tarde.
 HTTP/1.1 429 
-Content-Type: application/json
-Transfer-Encoding: chunked
-Date: Thu, 06 Nov 2025 16:59:43 GMT
+Content-Type: text/plain;charset=UTF-8
+Content-Length: 61
+Date: Fri, 07 Nov 2025 10:30:36 GMT
 
-{"error":"Too Many Requests","message":"Rate limit exceeded for client-1","timestamp":"2025-11-06T16:59:43.177822004Z","status":429}
+Limite de requisições excedido. Tente novamente mais tarde.
 HTTP/1.1 429 
-Content-Type: application/json
-Transfer-Encoding: chunked
-Date: Thu, 06 Nov 2025 16:59:44 GMT
+Content-Type: text/plain;charset=UTF-8
+Content-Length: 61
+Date: Fri, 07 Nov 2025 10:30:37 GMT
 
-{"error":"Too Many Requests","message":"Rate limit exceeded for client-1","timestamp":"2025-11-06T16:59:44.191404570Z","status":429}
+Limite de requisições excedido. Tente novamente mais tarde.
 ```

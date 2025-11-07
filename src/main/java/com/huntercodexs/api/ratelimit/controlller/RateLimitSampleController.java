@@ -1,17 +1,24 @@
 package com.huntercodexs.api.ratelimit.controlller;
 
+import java.util.concurrent.TimeUnit;
+
 import com.huntercodexs.api.ratelimit.annotation.RateLimit;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.concurrent.TimeUnit;
-
 @RestController
 public class RateLimitSampleController {
 
-    @GetMapping("/test")
-    @RateLimit(limit = 5, duration = 1, unit = TimeUnit.MINUTES) // exemplo: 5 requisições por 1 minuto por cliente
-    public String test() {
-        return "Dados liberados com sucesso!";
+    // Limite de 3 requisições a cada 10 segundos
+    @GetMapping("/api/limitado")
+    @RateLimit(limit = 3, duration = 10, unit = TimeUnit.SECONDS)
+    public String limitedEndpoint() {
+        return "Requisição permitida. Limite: 3/10s.";
+    }
+
+    // Endpoint sem Rate Limit para comparação
+    @GetMapping("/api/publico")
+    public String publicEndpoint() {
+        return "Requisição permitida. Este endpoint não tem Rate Limit.";
     }
 }

@@ -1,54 +1,56 @@
 package com.huntercodexs.api.ratelimit.config;
 
-import io.lettuce.core.RedisClient;
-import io.lettuce.core.RedisURI;
-import io.lettuce.core.api.StatefulRedisConnection;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
 
-import java.time.Duration;
-
+// Configuração do Redis
 @Configuration
 public class RedisConfig {
 
-    @Value("${redis.host:localhost}")
+    // Configuração de host e porta (podem vir do application.properties)
+    @Value("${spring.data.redis.host:localhost}")
     private String redisHost;
 
-    @Value("${redis.port:6379}")
+    @Value("${spring.data.redis.port:6379}")
     private int redisPort;
 
-    @Value("${redis.username:}")
-    private String redisUsername;
-
-    @Value("${redis.password:}")
+    // A senha do cliente deve vir de uma fonte segura
+    @Value("${spring.data.redis.password}")
     private String redisPassword;
 
-    @Value("${redis.timeout.seconds:5}")
-    private long timeoutSeconds;
+    /**
+     * Configuração da conexão com o Redis, incluindo autenticação.
+     * **Usar Redis com autenticacao de cliente (via configuracao direta em codigo)**
+     */
+    @Bean
+    public LettuceConnectionFactory redisConnectionFactory() {
+        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration();
+        config.setHostName(redisHost);
+        config.setPort(redisPort);
 
-    @Bean(destroyMethod = "shutdown")
-    public RedisClient redisClient() {
-        RedisURI.Builder builder = RedisURI.builder()
-                .withHost(redisHost)
-                .withPort(redisPort)
-                .withTimeout(Duration.ofSeconds(timeoutSeconds));
+        // Autenticação (senha do cliente)
+        config.setPassword(redisPassword);
 
-        if (redisPassword != null && !redisPassword.isBlank()) {
-            if (redisUsername != null && !redisUsername.isBlank()) {
-                builder.withAuthentication(redisUsername, redisPassword);
-            } else {
-                builder.withPassword(redisPassword.toCharArray());
-            }
-        }
-
-        RedisURI uri = builder.build();
-        return RedisClient.create(uri);
+        return new LettuceConnectionFactory(config);
     }
 
-    @Bean(destroyMethod = "close")
-    public StatefulRedisConnection<String, String> statefulRedisConnection(RedisClient redisClient) {
-        return redisClient.connect();
+    @Bean
+    public RedisTemplate<String, Long> redisTemplate(LettuceConnectionFactory connectionFactory) {
+        RedisTemplate<String, Long> template = new RedisTemplate<>();
+        template.setConnectionFactory(connectionFactory);
+
+        // Use String serializer para as chaves
+        template.setKeySerializer(new StringRedisSerializer());
+
+        // Use Long serializer para os valores (contagem de requisições)
+        template.setValueSerializer(new StringRedisSerializer());
+
+        return template;
     }
 }
 
