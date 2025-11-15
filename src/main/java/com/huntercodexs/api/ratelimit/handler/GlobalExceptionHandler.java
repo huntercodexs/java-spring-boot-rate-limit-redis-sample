@@ -12,7 +12,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(RateLimitExceededException.class)
     public ResponseEntity<Object> handleRateLimitExceededException(RateLimitExceededException ex, WebRequest request) {
-        String errorMessage = "Limite de requisições excedido. Tente novamente mais tarde.";
+        String errorMessage = "Limit of requests exceeded. Please try again later.";
         return new ResponseEntity<>(errorMessage, HttpStatus.TOO_MANY_REQUESTS);
     }
 }
