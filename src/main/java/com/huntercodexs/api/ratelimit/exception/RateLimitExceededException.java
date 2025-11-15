@@ -1,4 +1,4 @@
-package com.huntercodexs.api.ratelimit.handler.exception;
+package com.huntercodexs.api.ratelimit.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
