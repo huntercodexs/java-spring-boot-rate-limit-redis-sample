@@ -7,7 +7,7 @@ import java.util.concurrent.TimeUnit;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface RateLimit {
-    int limit();
-    int duration();
+    int limit() default 10;
+    int duration() default 60;
     TimeUnit unit() default TimeUnit.MINUTES;
 }
