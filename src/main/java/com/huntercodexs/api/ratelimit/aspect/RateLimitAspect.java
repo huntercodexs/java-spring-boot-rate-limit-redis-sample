@@ -29,13 +29,13 @@ public class RateLimitAspect {
     private boolean rateLimitEnabled;
 
     @Value("${rate-limit.limit:0}")
-    private int customLimit;
+    private int overrideLimit;
 
     @Value("${rate-limit.duration:0}")
-    private int customDuration;
+    private int overrideDuration;
 
     @Value("${rate-limit.unit:minutes}")
-    private String customUnit;
+    private String overrideUnit;
 
     @Value("${rate-limit.cache-prefix:ratelimit}")
     private String customPrefix;
@@ -75,28 +75,28 @@ public class RateLimitAspect {
 
         // Rate Limit Parameters
         int limit = rateLimit.limit();
-        if (customLimit > 0) limit = customLimit;
+        if (overrideLimit > 0) limit = overrideLimit;
 
         int duration = rateLimit.duration();
-        if (customDuration > 0) duration = customDuration;
+        if (overrideDuration > 0) duration = overrideDuration;
 
         // TTL Setup for the key on first increment
         TimeUnit unit = rateLimit.unit();
 
-        if (customUnit.equalsIgnoreCase("SECONDS")) {
+        if (overrideUnit.equalsIgnoreCase("SECONDS")) {
             if (currentCount == 1) {
-                redisTemplate.expire(redisKey, Duration.ofSeconds(TimeUnit.SECONDS.convert(duration, unit)));
                 unit = TimeUnit.SECONDS;
+                redisTemplate.expire(redisKey, Duration.ofSeconds(TimeUnit.SECONDS.convert(duration, unit)));
             }
-        } else if (customUnit.equalsIgnoreCase("MINUTES")) {
+        } else if (overrideUnit.equalsIgnoreCase("MINUTES")) {
             if (currentCount == 1) {
-                redisTemplate.expire(redisKey, Duration.ofMinutes(TimeUnit.MINUTES.convert(duration, unit)));
                 unit = TimeUnit.MINUTES;
+                redisTemplate.expire(redisKey, Duration.ofMinutes(TimeUnit.MINUTES.convert(duration, unit)));
             }
-        } else if (customUnit.equalsIgnoreCase("HOURS")) {
+        } else if (overrideUnit.equalsIgnoreCase("HOURS")) {
             if (currentCount == 1) {
-                redisTemplate.expire(redisKey, Duration.ofHours(TimeUnit.HOURS.convert(duration, unit)));
                 unit = TimeUnit.HOURS;
+                redisTemplate.expire(redisKey, Duration.ofHours(TimeUnit.HOURS.convert(duration, unit)));
             }
         } else {
             if (currentCount == 1) {
