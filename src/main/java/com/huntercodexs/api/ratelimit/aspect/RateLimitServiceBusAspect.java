@@ -9,6 +9,7 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterNameDiscoverer;
 import org.springframework.core.StandardReflectionParameterNameDiscoverer;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -23,6 +24,24 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class RateLimitServiceBusAspect {
 
+    @Value("${rate-limit-service-bus.enabled:true}")
+    private boolean rateLimitEnabled;
+
+    @Value("${rate-limit-service-bus.limit:0}")
+    private int customLimit;
+
+    @Value("${rate-limit-service-bus.duration:0}")
+    private int customDuration;
+
+    @Value("${rate-limit-service-bus.unit:seconds}")
+    private String customUnit;
+
+    @Value("${rate-limit-service-bus.cache-prefix:rateLimitServiceBusDefaultKeyName}")
+    private String customPrefix;
+
+    @Value("${rate-limit-service-bus.key-parameter:}")
+    private String customerKeyParameter;
+
     private static final Logger log = LoggerFactory.getLogger(RateLimitServiceBusAspect.class);
 
     private static final String MSG_RATE_LIMIT_EXCEEDED = "Limit of %d requests exceeded for key '%s' in %d %s.";
@@ -31,8 +50,13 @@ public class RateLimitServiceBusAspect {
 
     private final ParameterNameDiscoverer parameterNameDiscoverer = new StandardReflectionParameterNameDiscoverer();
 
-    @Around("@annotation(RateLimitServiceBus)")
+    @Around("@annotation(rateLimitServiceBus)")
     public Object rateLimit(ProceedingJoinPoint joinPoint, RateLimitServiceBus rateLimitServiceBus) throws Throwable {
+
+        if (!rateLimitEnabled) {
+            log.warn("Rate limiting service bus is disabled via configuration.");
+            return joinPoint.proceed();
+        }
 
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         Method method = signature.getMethod();
@@ -40,6 +64,8 @@ public class RateLimitServiceBusAspect {
 
         // Getting Rate Limit Key Value
         String keyParameterName = rateLimitServiceBus.keyParameterName();
+        if (customerKeyParameter != null && !customerKeyParameter.isEmpty()) keyParameterName = customerKeyParameter;
+
         Object rateLimitKeyValue = findParameterValue(method, args, keyParameterName);
 
         if (rateLimitKeyValue == null) {
@@ -49,20 +75,49 @@ public class RateLimitServiceBusAspect {
         }
 
         // Building the Redis Key - Format: rateLimitServiceBusKeyName:consumer:<METHOD_NAME>:<KEY_VALUE>
-        String redisKey = String.format("rateLimitServiceBusKeyName:consumer:%s:%s", method.getName(), rateLimitKeyValue);
-
-        // Get values from annotation
-        int limit = rateLimitServiceBus.limit();
-        int duration = rateLimitServiceBus.duration();
-        TimeUnit unit = rateLimitServiceBus.unit();
-        long durationInSeconds = TimeUnit.SECONDS.convert(duration, unit);
+        String redisKey = String.format(customPrefix+":consumer:%s:%s", method.getName(), rateLimitKeyValue);
 
         // Rate limiting logic
         Long currentCount = redisTemplate.opsForValue().increment(redisKey);
 
-        if (currentCount == null) return joinPoint.proceed();
+        if (currentCount == null) {
+            // Prevent null pointer exception, though it shouldn't happen
+            return joinPoint.proceed();
+        }
 
-        if (currentCount == 1) redisTemplate.expire(redisKey, Duration.ofSeconds(durationInSeconds));
+        // Get values from annotation
+        int limit = rateLimitServiceBus.limit();
+        if (customLimit > 0) limit = customLimit;
+
+        int duration = rateLimitServiceBus.duration();
+        if (customDuration > 0) duration = customDuration;
+
+        // TTL Setup for the key on first increment
+        TimeUnit unit = rateLimitServiceBus.unit();
+
+        if (customUnit.equalsIgnoreCase("SECONDS")) {
+            if (currentCount == 1) {
+                unit = TimeUnit.SECONDS;
+                redisTemplate.expire(redisKey, Duration.ofSeconds(TimeUnit.SECONDS.convert(duration, unit)));
+            }
+        } else if (customUnit.equalsIgnoreCase("MINUTES")) {
+            if (currentCount == 1) {
+                unit = TimeUnit.MINUTES;
+                redisTemplate.expire(redisKey, Duration.ofMinutes(TimeUnit.MINUTES.convert(duration, unit)));
+            }
+        } else if (customUnit.equalsIgnoreCase("HOURS")) {
+            if (currentCount == 1) {
+                unit = TimeUnit.HOURS;
+                redisTemplate.expire(redisKey, Duration.ofHours(TimeUnit.HOURS.convert(duration, unit)));
+            }
+        } else {
+            if (currentCount == 1) {
+                unit = TimeUnit.SECONDS;
+                redisTemplate.expire(redisKey, Duration.ofSeconds(TimeUnit.SECONDS.convert(duration, unit)));
+            }
+        }
+
+        log.info("Rate Limit Service Bus Check - Key: {}, Count: {}, Limit: {}/{} {}", redisKey, currentCount, limit, duration, unit);
 
         // Check if limit exceeded
         if (currentCount > limit) {

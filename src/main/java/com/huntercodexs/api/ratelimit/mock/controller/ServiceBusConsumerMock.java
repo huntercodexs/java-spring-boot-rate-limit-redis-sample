@@ -23,7 +23,7 @@ public class ServiceBusConsumerMock {
      * it can be userId, orderId, etc... inside the message payload.
      */
     @PostMapping("/simulate-queue-process")
-    @RateLimitServiceBus(limit = 2, duration = 15, unit = TimeUnit.SECONDS, keyParameterName = "message")
+    @RateLimitServiceBus(limit = 3, duration = 10, unit = TimeUnit.SECONDS, keyParameterName = "message")
     public ResponseEntity<String> processMessage(@RequestBody ProcessMessage message) {
         log.info("Processing message for UserID: {}", message.getUserId());
 
