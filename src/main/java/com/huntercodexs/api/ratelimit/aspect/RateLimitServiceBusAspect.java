@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
 import java.time.Duration;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 @Aspect
@@ -28,126 +29,103 @@ public class RateLimitServiceBusAspect {
     private boolean rateLimitEnabled;
 
     @Value("${rate-limit-service-bus.limit:0}")
-    private int customLimit;
+    private int overrideLimit;
 
     @Value("${rate-limit-service-bus.duration:0}")
-    private int customDuration;
+    private int overrideDuration;
 
-    @Value("${rate-limit-service-bus.unit:seconds}")
-    private String customUnit;
+    @Value("${rate-limit-service-bus.unit:SECONDS}")
+    private String overrideUnit;
 
     @Value("${rate-limit-service-bus.cache-prefix:rateLimitServiceBusDefaultKeyName}")
-    private String customPrefix;
+    private String prefix;
 
     @Value("${rate-limit-service-bus.key-parameter:}")
-    private String customerKeyParameter;
+    private String overrideKeyParameter;
 
     private static final Logger log = LoggerFactory.getLogger(RateLimitServiceBusAspect.class);
 
-    private static final String MSG_RATE_LIMIT_EXCEEDED = "Limit of %d requests exceeded for key '%s' in %d %s.";
-
     private final RedisTemplate<String, Long> redisTemplate;
+    private final ParameterNameDiscoverer nameDiscoverer = new StandardReflectionParameterNameDiscoverer();
 
-    private final ParameterNameDiscoverer parameterNameDiscoverer = new StandardReflectionParameterNameDiscoverer();
-
-    @Around("@annotation(rateLimitServiceBus)")
-    public Object rateLimit(ProceedingJoinPoint joinPoint, RateLimitServiceBus rateLimitServiceBus) throws Throwable {
+    @Around("@annotation(rateLimit)")
+    public Object applyRateLimit(ProceedingJoinPoint joinPoint, RateLimitServiceBus rateLimit) throws Throwable {
 
         if (!rateLimitEnabled) {
-            log.warn("Rate limiting service bus is disabled via configuration.");
             return joinPoint.proceed();
         }
 
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         Method method = signature.getMethod();
-        Object[] args = joinPoint.getArgs(); // Get method arguments (message, headers, etc.)
 
-        // Getting Rate Limit Key Value
-        String keyParameterName = rateLimitServiceBus.keyParameterName();
-        if (customerKeyParameter != null && !customerKeyParameter.isEmpty()) keyParameterName = customerKeyParameter;
+        Object[] args = joinPoint.getArgs();
 
-        Object rateLimitKeyValue = findParameterValue(method, args, keyParameterName);
+        // Determine key parameter
+        String keyParamName = (overrideKeyParameter != null && !overrideKeyParameter.isBlank())
+                ? overrideKeyParameter
+                : rateLimit.keyParameterName();
 
-        if (rateLimitKeyValue == null) {
-            // If the key parameter is not found or is null, handle accordingly.
-            log.warn("Alert: Rate Limit key parameter not found or is null. Request allowed.");
+        Object keyValue = resolveMethodArg(method, args, keyParamName);
+        if (keyValue == null) {
             return joinPoint.proceed();
         }
 
-        // Building the Redis Key - Format: rateLimitServiceBusKeyName:consumer:<METHOD_NAME>:<KEY_VALUE>
-        String redisKey = String.format(customPrefix+":consumer:%s:%s", method.getName(), rateLimitKeyValue);
+        String redisKey = "%s:consumer:%s:%s".formatted(
+                prefix, method.getName(), keyValue.toString()
+        );
 
-        // Rate limiting logic
-        Long currentCount = redisTemplate.opsForValue().increment(redisKey);
+        // increment counter
+        Long count = redisTemplate.opsForValue().increment(redisKey);
 
-        if (currentCount == null) {
-            // Prevent null pointer exception, though it shouldn't happen
+        if (count == null) {
             return joinPoint.proceed();
         }
 
-        // Get values from annotation
-        int limit = rateLimitServiceBus.limit();
-        if (customLimit > 0) limit = customLimit;
+        // resolve configs
+        int limit = overrideLimit > 0 ? overrideLimit : rateLimit.limit();
+        int duration = overrideDuration > 0 ? overrideDuration : rateLimit.duration();
+        TimeUnit unit = resolveTimeUnit(overrideUnit, rateLimit.unit());
 
-        int duration = rateLimitServiceBus.duration();
-        if (customDuration > 0) duration = customDuration;
-
-        // TTL Setup for the key on first increment
-        TimeUnit unit = rateLimitServiceBus.unit();
-
-        if (customUnit.equalsIgnoreCase("SECONDS")) {
-            if (currentCount == 1) {
-                unit = TimeUnit.SECONDS;
-                redisTemplate.expire(redisKey, Duration.ofSeconds(TimeUnit.SECONDS.convert(duration, unit)));
-            }
-        } else if (customUnit.equalsIgnoreCase("MINUTES")) {
-            if (currentCount == 1) {
-                unit = TimeUnit.MINUTES;
-                redisTemplate.expire(redisKey, Duration.ofMinutes(TimeUnit.MINUTES.convert(duration, unit)));
-            }
-        } else if (customUnit.equalsIgnoreCase("HOURS")) {
-            if (currentCount == 1) {
-                unit = TimeUnit.HOURS;
-                redisTemplate.expire(redisKey, Duration.ofHours(TimeUnit.HOURS.convert(duration, unit)));
-            }
-        } else {
-            if (currentCount == 1) {
-                unit = TimeUnit.SECONDS;
-                redisTemplate.expire(redisKey, Duration.ofSeconds(TimeUnit.SECONDS.convert(duration, unit)));
-            }
+        // define TTL only on first request
+        if (count == 1) {
+            redisTemplate.expire(redisKey, Duration.ofMillis(unit.toMillis(duration)));
         }
 
-        log.info("Rate Limit Service Bus Check - Key: {}, Count: {}, Limit: {}/{} {}", redisKey, currentCount, limit, duration, unit);
+        log.info("ServiceBus RateLimit Key={} Count={} Limit={}/{} {}", redisKey, count, limit, duration, unit);
 
-        // Check if limit exceeded
-        if (currentCount > limit) {
-            // When the limit is exceeded, throw an exception, this exception will be handled globally.
-            // In this case, we throw RateLimitExceededException and the Spring Cloud Stream/ASB binder
-            // will be able to catch it and not acknowledge the message, allowing for reprocessing later.
-            limitExceededAction(rateLimitKeyValue, limit, duration, unit);
+        // limit exceeded
+        if (count > limit) {
+            throw new RateLimitExceededException(
+                    "Rate limit exceeded: key=%s limit=%d per %d %s"
+                            .formatted(keyValue, limit, duration, unit)
+            );
         }
 
-        // Proceed with the method execution
         return joinPoint.proceed();
     }
 
-    private void limitExceededAction(Object rateLimitKeyValue, int limit, int duration, TimeUnit unit) {
-        throw new RateLimitExceededException(String.format(
-                MSG_RATE_LIMIT_EXCEEDED, limit, rateLimitKeyValue, duration, unit.toString().toLowerCase()));
+    private TimeUnit resolveTimeUnit(String overrideUnit, TimeUnit annotationUnit) {
+        if (overrideUnit == null || overrideUnit.isBlank()) {
+            return annotationUnit;
+        }
+
+        return switch (overrideUnit.trim().toUpperCase(Locale.ROOT)) {
+            case "SECONDS", "SEC", "S" -> TimeUnit.SECONDS;
+            case "MINUTES", "MIN", "M" -> TimeUnit.MINUTES;
+            case "HOURS", "HOUR", "H" -> TimeUnit.HOURS;
+            default -> annotationUnit;
+        };
     }
 
-    /**
-     * Makes the mapping from parameter name to actual argument value.
-     * Requires the -parameters flag in the compiler.
-     */
-    private Object findParameterValue(Method method, Object[] args, String parameterName) {
-        String[] parameterNames = parameterNameDiscoverer.getParameterNames(method);
+    private Object resolveMethodArg(Method method, Object[] args, String paramName) {
+        if (paramName == null || paramName.isBlank()) return null;
 
-        if (parameterNames != null) {
-            for (int i = 0; i < parameterNames.length; i++) {
-                if (parameterNames[i].equals(parameterName)) {
-                    return args[i];
-                }
+        String[] names = nameDiscoverer.getParameterNames(method);
+        if (names == null) return null;
+
+        for (int i = 0; i < names.length; i++) {
+            if (names[i].equals(paramName)) {
+                return args[i];
             }
         }
         return null;

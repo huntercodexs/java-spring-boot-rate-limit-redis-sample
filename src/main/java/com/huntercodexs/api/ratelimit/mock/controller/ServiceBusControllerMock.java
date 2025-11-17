@@ -12,9 +12,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.concurrent.TimeUnit;
 
 @RestController
-public class ServiceBusConsumerMock {
+public class ServiceBusControllerMock {
 
-    private static final Logger log = LoggerFactory.getLogger(ServiceBusConsumerMock.class);
+    private static final Logger log = LoggerFactory.getLogger(ServiceBusControllerMock.class);
 
     /**
      * MOCK endpoint that simulates processing messages from a Service Bus queue with rate limiting.
