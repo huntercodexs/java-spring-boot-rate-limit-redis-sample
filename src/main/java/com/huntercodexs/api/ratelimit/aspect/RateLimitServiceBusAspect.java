@@ -1,5 +1,7 @@
 package com.huntercodexs.api.ratelimit.aspect;
 
+import com.azure.messaging.servicebus.ServiceBusReceivedMessageContext;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.huntercodexs.api.ratelimit.annotation.RateLimitServiceBus;
 import com.huntercodexs.api.ratelimit.handler.exception.RateLimitExceededException;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 @Aspect
 @Component
 @RequiredArgsConstructor
+@SuppressWarnings({"java:S3776", "java:S3457"})
 public class RateLimitServiceBusAspect {
 
     @Value("${rate-limit-service-bus.enabled:true}")
@@ -39,7 +42,7 @@ public class RateLimitServiceBusAspect {
     @Value("${rate-limit-service-bus.cache-prefix:rateLimitServiceBusDefaultKeyName}")
     private String customPrefix;
 
-    @Value("${rate-limit-service-bus.key-parameter:}")
+    @Value("${rate-limit-service-bus.key-parameter:_MENSAGEM_INTEIRA_}")
     private String customerKeyParameter;
 
     private static final Logger log = LoggerFactory.getLogger(RateLimitServiceBusAspect.class);
@@ -48,13 +51,14 @@ public class RateLimitServiceBusAspect {
 
     private final RedisTemplate<String, Long> redisTemplate;
 
+    private final ObjectMapper mapper = new ObjectMapper();
     private final ParameterNameDiscoverer parameterNameDiscoverer = new StandardReflectionParameterNameDiscoverer();
 
     @Around("@annotation(rateLimitServiceBus)")
     public Object rateLimit(ProceedingJoinPoint joinPoint, RateLimitServiceBus rateLimitServiceBus) throws Throwable {
 
         if (!rateLimitEnabled) {
-            log.warn("Rate limiting service bus is disabled via configuration.");
+            log.warn("The service bus rate limiting is disabled via configuration.");
             return joinPoint.proceed();
         }
 
@@ -68,14 +72,14 @@ public class RateLimitServiceBusAspect {
 
         Object rateLimitKeyValue = findParameterValue(method, args, keyParameterName);
 
-        if (rateLimitKeyValue == null) {
+        if (rateLimitKeyValue == null && !keyParameterName.equals("_MENSAGEM_INTEIRA_")) {
             // If the key parameter is not found or is null, handle accordingly.
-            log.warn("Alert: Rate Limit key parameter not found or is null. Request allowed.");
+            log.warn("Alert: Key parameter for Rate Limit not found or is null. Request allowed.");
             return joinPoint.proceed();
         }
 
         // Building the Redis Key - Format: rateLimitServiceBusKeyName:consumer:<METHOD_NAME>:<KEY_VALUE>
-        String redisKey = String.format(customPrefix+":consumer:%s:%s", method.getName(), rateLimitKeyValue);
+        String redisKey = String.format(customPrefix + ":consumer:%s:%s", method.getName(), keyParameterName);
 
         // Rate limiting logic
         Long currentCount = redisTemplate.opsForValue().increment(redisKey);
@@ -119,27 +123,30 @@ public class RateLimitServiceBusAspect {
 
         log.info("Rate Limit Service Bus Check - Key: {}, Count: {}, Limit: {}/{} {}", redisKey, currentCount, limit, duration, unit);
 
-        // Check if limit exceeded
         if (currentCount > limit) {
-            // When the limit is exceeded, throw an exception, this exception will be handled globally.
-            // In this case, we throw RateLimitExceededException and the Spring Cloud Stream/ASB binder
-            // will be able to catch it and not acknowledge the message, allowing for reprocessing later.
-            limitExceededAction(rateLimitKeyValue, limit, duration, unit);
+            limitExceededAction(args, keyParameterName, limit, duration, unit);
         }
 
         // Proceed with the method execution
         return joinPoint.proceed();
     }
 
-    private void limitExceededAction(Object rateLimitKeyValue, int limit, int duration, TimeUnit unit) {
+    private void limitExceededAction(Object[] args, Object keyParameterName, int limit, int duration, TimeUnit unit) {
+
+        String mensagemExcedida = String.format(
+                "Rate Limite excedido para a chave %s com limit de %d requisicoes em %d %s.",
+                keyParameterName, limit, duration, unit.toString().toLowerCase());
+
+        log.error("429 TOO_MANY_REQUESTS - {}", mensagemExcedida);
+
+        ServiceBusReceivedMessageContext message = (ServiceBusReceivedMessageContext) args[0];
+
+        /*Make some code here to process the message*/
+
         throw new RateLimitExceededException(String.format(
-                MSG_RATE_LIMIT_EXCEEDED, limit, rateLimitKeyValue, duration, unit.toString().toLowerCase()));
+                MSG_RATE_LIMIT_EXCEEDED, limit, keyParameterName, duration, unit.toString().toLowerCase()));
     }
 
-    /**
-     * Makes the mapping from parameter name to actual argument value.
-     * Requires the -parameters flag in the compiler.
-     */
     private Object findParameterValue(Method method, Object[] args, String parameterName) {
         String[] parameterNames = parameterNameDiscoverer.getParameterNames(method);
 

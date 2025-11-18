@@ -1,4 +1,4 @@
-package com.huntercodexs.api.ratelimit.dto;
+package com.huntercodexs.api.ratelimit.simulation.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -9,6 +9,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ProcessMessage {
     private String id;
-    private String userId; // Identifier for rate limiting
+    private String userId;
     private String content;
 }

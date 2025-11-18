@@ -1,5 +1,6 @@
 package com.huntercodexs.api.ratelimit;
 
+import com.azure.messaging.servicebus.ServiceBusReceivedMessageContext;
 import com.huntercodexs.api.ratelimit.annotation.RateLimitServiceBus;
 import com.huntercodexs.api.ratelimit.aspect.RateLimitServiceBusAspect;
 import com.huntercodexs.api.ratelimit.handler.exception.RateLimitExceededException;
@@ -40,12 +41,14 @@ class RateLimitServiceBusAspectTest {
     @Mock
     private RateLimitServiceBus rateLimitServiceBus;
 
+    @Mock
+    private ServiceBusReceivedMessageContext serviceBusContext;
+
     @InjectMocks
     private RateLimitServiceBusAspect rateLimitServiceBusAspect;
 
     private static final String KEY_PARAM_NAME = "message";
-    private static final String TEST_USER_KEY = "userX";
-    private static final String EXPECTED_KEY_PREFIX = "rateLimitServiceBusDefaultKeyName:consumer:processMessage:" + TEST_USER_KEY;
+    private static final String EXPECTED_KEY_PREFIX = "rateLimitServiceBusDefaultKeyName:consumer:processMessage:" + KEY_PARAM_NAME;
 
     @BeforeEach
     void setup() {
@@ -129,7 +132,7 @@ class RateLimitServiceBusAspectTest {
 
         rateLimitServiceBusAspect.rateLimit(joinPoint, rateLimitServiceBus);
 
-        String expectedKey = customPrefix + ":consumer:processMessage:" + TEST_USER_KEY;
+        String expectedKey = customPrefix + ":consumer:processMessage:" + KEY_PARAM_NAME;
         verify(valueOperations, times(1)).increment(eq(expectedKey));
     }
 
@@ -145,23 +148,16 @@ class RateLimitServiceBusAspectTest {
 
     private static class TestConsumer {
         @RateLimitServiceBus(limit = 2, duration = 10, unit = TimeUnit.SECONDS, keyParameterName = KEY_PARAM_NAME)
-        public void processMessage(TestMessage message) {}
-    }
-
-    private static class TestMessage {
-        private final String userId;
-        public TestMessage(String userId) { this.userId = userId; }
-        @Override
-        public String toString() { return userId; }
+        public void processMessage(ServiceBusReceivedMessageContext message) {}
     }
 
     private void makeWay() throws NoSuchMethodException {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
 
         when(joinPoint.getSignature()).thenReturn(methodSignature);
-        Method method = TestConsumer.class.getMethod("processMessage", TestMessage.class);
+        Method method = TestConsumer.class.getMethod("processMessage", ServiceBusReceivedMessageContext.class);
         when(methodSignature.getMethod()).thenReturn(method);
-        when(joinPoint.getArgs()).thenReturn(new Object[]{new TestMessage(TEST_USER_KEY)});
+        when(joinPoint.getArgs()).thenReturn(new Object[]{serviceBusContext});
 
         when(rateLimitServiceBus.limit()).thenReturn(2);
         when(rateLimitServiceBus.duration()).thenReturn(10);
